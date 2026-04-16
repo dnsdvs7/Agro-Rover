@@ -1,0 +1,108 @@
+﻿import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { WebView } from 'react-native-webview';
+
+// Raspberry Pi's IP Address
+const PI_URL = 'http://192.168.10.222:5000';
+
+export default function App() {
+    const [detectionResult, setDetectionResult] = useState('Waiting for scan...');
+
+    // Function to send movement commands to your Flask /move endpoint
+    const sendCommand = async (cmd: string) => {
+        try {
+            await fetch(`${PI_URL}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd }),
+            });
+        } catch (error) {
+            console.log('Error sending command:', error);
+        }
+    };
+
+    // Function to ask Flask to run the YOLO model via /detect endpoint
+    const detectDisease = async () => {
+        setDetectionResult('Scanning...');
+        try {
+            const response = await fetch(`${PI_URL}/detect`);
+            const data = await response.json();
+            setDetectionResult(`${data.disease} (Confidence: ${data.confidence})`);
+        } catch (error) {
+            setDetectionResult('Error connecting to Pi');
+        }
+    };
+
+    return (
+        <View style={styles.container}>
+            <Text style={styles.header}>🍅 Rover Command Center</Text>
+
+            {/* Video Feed - Swapped Image for WebView to support MJPEG streams */}
+            <View style={styles.videoContainer}>
+                <WebView
+                    source={{ uri: `${PI_URL}/video_feed` }}
+                    style={styles.video}
+                    scrollEnabled={false}
+                    originWhitelist={['*']}
+                />
+            </View>
+
+            {/* Detection Results */}
+            <View style={styles.detectionBox}>
+                <Text style={styles.detectionText}>{detectionResult}</Text>
+                <TouchableOpacity style={styles.detectButton} onPress={detectDisease}>
+                    <Text style={styles.buttonText}>Scan Plant</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Driving Controls */}
+            <View style={styles.controlGrid}>
+                <View style={styles.row}>
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('up')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Cam Up</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('forward')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Forward</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('down')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Cam Down</Text>
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.row}>
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('left')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Left</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnStop} onPress={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>STOP</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('right')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Right</Text>
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.row}>
+                    <View style={styles.emptyBtn} />
+                    <TouchableOpacity style={styles.btn} onPressIn={() => sendCommand('backward')} onPressOut={() => sendCommand('stop')}>
+                        <Text style={styles.buttonText}>Back</Text>
+                    </TouchableOpacity>
+                    <View style={styles.emptyBtn} />
+                </View>
+            </View>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#121212', alignItems: 'center', paddingTop: 50 },
+    header: { fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 15 },
+    videoContainer: { width: 320, height: 240, backgroundColor: '#333', borderRadius: 10, overflow: 'hidden', marginBottom: 20 },
+    video: { width: '100%', height: '100%', backgroundColor: 'transparent' },
+    detectionBox: { width: 320, padding: 15, backgroundColor: '#1e1e1e', borderRadius: 10, alignItems: 'center', marginBottom: 20 },
+    detectionText: { color: '#00ff00', fontSize: 16, marginBottom: 10 },
+    detectButton: { backgroundColor: '#e74c3c', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+    controlGrid: { width: 320, alignItems: 'center' },
+    row: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 10 },
+    btn: { backgroundColor: '#3498db', width: 90, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
+    btnStop: { backgroundColor: '#e74c3c', width: 90, height: 60, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
+    emptyBtn: { width: 90, height: 60 },
+    buttonText: { color: 'white', fontWeight: 'bold' }
+});
